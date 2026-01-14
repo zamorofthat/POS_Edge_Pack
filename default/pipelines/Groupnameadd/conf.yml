@@ -1,0 +1,15 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+functions:
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      keep:
+        - "*"
+      add:
+        - disabled: false
+          value: '`${host}-${__metadata["cribl"].group}-pos`'
+          name: host

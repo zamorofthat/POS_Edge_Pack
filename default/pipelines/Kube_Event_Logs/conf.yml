@@ -1,0 +1,44 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+functions:
+  - id: auto_timestamp
+    filter: "true"
+    disabled: null
+    conf:
+      srcField: object.metadata.creationTimestamp
+      dstField: _time
+      defaultTimezone: local
+      timeExpression: time.getTime() / 1000
+      offset: 0
+      maxLen: 150
+      defaultTime: now
+      latestDateAllowed: +1week
+      earliestDateAllowed: -420weeks
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      add:
+        - disabled: false
+          name: message
+          value: object.note
+        - disabled: false
+          name: namespace
+          value: object.metadata.namespace
+        - disabled: false
+          name: pod_name
+          value: object.regarding.name
+        - disabled: false
+          name: reason
+          value: object.reason
+      keep:
+        - _time
+        - namespace
+        - pod_name
+        - reason
+        - message
+      remove:
+        - "*"
+    final: true

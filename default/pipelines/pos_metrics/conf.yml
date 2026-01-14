@@ -1,0 +1,61 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: |-
+        === POS Metrics Pipeline ===
+        Handles: prom, kube_metrics, system_metrics
+        Enriches with K8s context and filters noise
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: metric_source
+          value: dataSource || 'unknown'
+        - name: metric_host
+          value: "`${host || kube_node || 'unknown'}-${__metadata.cribl.group}-pos`"
+    description: Add metric source classification and host
+  - id: eval
+    filter: kube_pod
+    disabled: false
+    conf:
+      add:
+        - name: service
+          value: kube_container || kube_pod.split('-').slice(0,-2).join('-') || 'unknown'
+        - name: namespace
+          value: kube_namespace
+    description: Extract service name from pod
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: is_pos_service
+          value: kube_namespace === 'pos' || namespace === 'pos'
+        - name: is_cribl_edge
+          value: kube_namespace === 'cribl' || namespace === 'cribl'
+    description: Classify by namespace
+  - id: sampling
+    filter: "!is_pos_service && !is_cribl_edge"
+    disabled: false
+    conf:
+      rules:
+        - filter: "true"
+          rate: 10
+    description: Sample 10% of non-POS metrics (reduce noise)
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      remove:
+        - is_pos_service
+        - is_cribl_edge
+    description: Cleanup temp fields
+description: POS metrics pipeline - handles prom, kube_metrics, system_metrics
+  with K8s enrichment

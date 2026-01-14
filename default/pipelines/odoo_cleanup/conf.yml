@@ -1,0 +1,243 @@
+output: default
+streamtags: []
+groups:
+  QkDOjN:
+    name: WebServer Group
+    description: Events from werkzeug service
+    disabled: false
+    index: 3
+  89kOqh:
+    name: Cron Event Group
+    index: 5
+  orP683:
+    name: POS Event Group
+    index: 7
+asyncFuncTimeout: 1000
+functions:
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Parse event data from log item
+  - id: serde
+    filter: "true"
+    disabled: null
+    conf:
+      mode: extract
+      type: regex
+      srcField: _raw
+      iterations: 100
+      overwrite: false
+      regex: /(?<time>\d{4}-\d{2}-\d{2}
+        \d{2}:\d{2}:\d{2},\d{3})\s+\d+\s+(?<log_level>\w+)\s+(?<module>\w+)\s+(?<submodule>[\w\.]+):\s*(?<event>.+?)\s*$/
+    description: "Parse events "
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Parse webserver (wekzeug) event data
+  - id: serde
+    filter: submodule == 'werkzeug'
+    disabled: false
+    conf:
+      mode: extract
+      type: regex
+      srcField: event
+      iterations: 100
+      overwrite: false
+      regex: /(?<src_ip>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) - -
+        \[(?<datetime>[^\]]+)\] "(?<method>\w+) (?<endpoint>[^\s]+)
+        (?<protocol>[^\"]+)" (?<status>\d{3}) - (?<bytes>\d+)
+        (?<app_time>\d+\.\d+) (?<resp_time>\d+\.\d+)/
+    final: false
+    groupId: QkDOjN
+  - id: serialize
+    filter: submodule == 'werkzeug'
+    disabled: false
+    conf:
+      type: json
+      dstField: _raw
+      fields:
+        - "!_*"
+        - "!module"
+        - "!cribl*"
+        - "!host"
+        - "!time"
+        - "!kube*"
+        - "!event"
+        - "!submodule"
+        - "!datetime"
+        - "!log_level"
+        - "*"
+      cleanFields: false
+    groupId: QkDOjN
+  - id: eval
+    filter: submodule == 'werkzeug'
+    disabled: false
+    conf:
+      remove:
+        - "*"
+      keep:
+        - _raw
+        - host
+        - source
+        - sourcetype
+        - _time
+      add:
+        - disabled: false
+          name: source
+          value: kube_container
+        - disabled: false
+          name: sourcetype
+          value: submodule
+        - disabled: false
+          name: host
+          value: '`${host}-${__metadata["cribl"].group}-pos`'
+    groupId: QkDOjN
+    final: true
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Parse cron event data
+  - id: serde
+    filter: submodule == 'odoo.addons.base.models.ir_cron'
+    disabled: false
+    conf:
+      mode: extract
+      type: regex
+      srcField: event
+      iterations: 100
+      overwrite: false
+      regex: /(?<job_status>Starting job|Job
+        done):?\s+`(?<job_name>[^`]+)`(?:\s+\((?<duration>[\d\.]+)s\))?\./
+    groupId: 89kOqh
+  - id: serialize
+    filter: submodule == 'odoo.addons.base.models.ir_cron'
+    disabled: null
+    conf:
+      type: json
+      dstField: _raw
+      fields:
+        - "!_*"
+        - "!cribl_breaker"
+        - "!module"
+        - "!cribl_*"
+        - "!host"
+        - "!time"
+        - "!kube*"
+        - "!event"
+        - "!submodule"
+        - "!datetime"
+        - "!log_level"
+        - "*"
+      cleanFields: false
+    groupId: 89kOqh
+  - id: eval
+    filter: submodule == 'odoo.addons.base.models.ir_cron'
+    disabled: false
+    conf:
+      remove:
+        - "*"
+      keep:
+        - _raw
+        - host
+        - source
+        - sourcetype
+        - _time
+      add:
+        - disabled: false
+          name: source
+          value: kube_container
+        - disabled: false
+          name: sourcetype
+          value: submodule
+    final: true
+    groupId: 89kOqh
+  - id: comment
+    filter: "true"
+    disabled: null
+    conf:
+      comment: Parse POS order event group
+  - id: serde
+    filter: submodule == 'odoo.addons.point_of_sale.models.pos_order'
+    disabled: false
+    conf:
+      mode: extract
+      type: regex
+      srcField: event
+      iterations: 100
+      overwrite: false
+      regex: "/(?<action>Start|Finish) (?<section>PoS synchronisation)
+        #(?<sync_id>\\d+) (?:for PoS orders references:
+        \\[(?<order_list>'[^']*'(?:, '[^']*')*)\\] \\(draft:
+        (?<draft_status>\\w+)\\)|with result: (?<result>.+))/"
+    description: Parse POS events
+    groupId: orP683
+  - id: serde
+    filter: submodule == 'odoo.addons.point_of_sale.models.pos_order'
+    disabled: false
+    conf:
+      mode: extract
+      type: regex
+      srcField: result
+      iterations: 100
+      overwrite: false
+      regex: /\{\s*'id':\s*(?<trans_id>\d+),\s*'pos_reference':\s*'Order\s(?<order_id>[^']+)',\s*'account_move':\s*(?<account_move>\w+)\s*\}/
+    groupId: orP683
+  - id: serialize
+    filter: submodule == 'odoo.addons.point_of_sale.models.pos_order'
+    disabled: null
+    conf:
+      type: json
+      dstField: _raw
+      fields:
+        - "!_*"
+        - "!kube*"
+        - "!event"
+        - "!submodule"
+        - "!cribl_breaker"
+        - "!host"
+        - "!log_level"
+        - "!time"
+        - "!module"
+        - "!result"
+        - "*"
+      cleanFields: false
+    groupId: orP683
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      keep:
+        - _raw
+        - host
+        - source
+        - sourcetype
+        - _time
+      remove:
+        - "*"
+      add:
+        - disabled: false
+          value: kube_container
+          name: source
+        - disabled: false
+          name: sourcetype
+          value: submodule
+        - disabled: false
+          name: host
+          value: '`${host}-${__metadata["cribl"].group}-pos`'
+    groupId: orP683
+    final: true
+  - id: eval
+    filter: submodule != 'odoo.addons.base.models.ir_cron' && submodule !=
+      'odoo.addons.point_of_sale.models.pos_order' && submodule != 'werkzeug'
+    disabled: false
+    conf:
+      add:
+        - disabled: false
+          name: parsed
+          value: "false"
+      remove: []
+    description: Capture types I am not parsing.
+    final: true

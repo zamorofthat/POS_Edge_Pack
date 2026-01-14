@@ -1,0 +1,93 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+functions:
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: is_json_event
+          value: _raw && _raw.trim().startsWith('{')
+        - name: is_uvicorn_log
+          value: _raw && _raw.startsWith('INFO:')
+        - name: is_http_request
+          value: _raw && _raw.startsWith('HTTP Request:')
+    description: Detect log format
+  - id: serde
+    filter: is_json_event
+    disabled: false
+    conf:
+      mode: extract
+      type: json
+      srcField: _raw
+    description: Parse JSON events
+  - id: regex_extract
+    filter: is_uvicorn_log
+    disabled: false
+    conf:
+      source: _raw
+      iterations: 100
+      overwrite: false
+      regex: /^(?<log_level>\w+):\s+(?<client_ip>[\d.]+):(?<client_port>\d+)\s+-\s+"(?<http_method>\w+)\s+(?<http_path>[^\s]+)\s+(?<http_protocol>[^"]+)"\s+(?<http_status>\d+)/
+    description: Parse uvicorn access logs
+  - id: regex_extract
+    filter: is_http_request
+    disabled: false
+    conf:
+      source: _raw
+      iterations: 100
+      overwrite: false
+      regex: /^HTTP
+        Request:\s+(?<http_method>\w+)\s+(?<http_url>[^\s]+)\s+"(?<http_protocol>[^\s]+)\s+(?<http_status>\d+)/
+    description: Parse HTTP Request logs
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      add:
+        - name: log_type
+          value: "is_json_event ? event_type : is_http_request ? 'http_client' :
+            'http_access'"
+        - name: pos_service
+          value: service || kube_container || 'unknown'
+        - name: http_status_code
+          value: "http_status ? parseInt(http_status) : null"
+          disabled: true
+    description: Classify and enrich
+  - id: drop
+    filter: (http_path && http_path.includes('/health')) || (http_url &&
+      http_url.includes('/health'))
+    disabled: true
+    conf: {}
+    description: Drop health checks
+  - id: sampling
+    filter: log_type === 'http_client'
+    disabled: false
+    conf:
+      rules:
+        - filter: "true"
+          rate: 5
+    description: Sample 20% of inter-service calls
+  - id: eval
+    filter: "true"
+    disabled: false
+    conf:
+      remove:
+        - is_json_event
+        - is_uvicorn_log
+        - is_http_request
+        - http_protocol
+        - client_port
+    description: Cleanup temp fields
+  - id: sampling
+    filter: (http_path && http_path.includes('/health')) || (http_url &&
+      http_url.includes('/health'))
+    disabled: false
+    conf:
+      rules:
+        - filter: "true"
+          rate: 5
+    description: Sample 20% of inter-service calls
+description: POS logs pipeline - handles uvicorn, JSON events, and HTTP client logs

@@ -1,0 +1,93 @@
+id: default
+groups: {}
+comments: []
+routes:
+  - id: 7VrzBq
+    name: K8_events
+    final: false
+    disabled: false
+    pipeline: Kube_Event_Logs
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: "__inputId=='kube_events:in_kube_events' "
+    clones:
+      - {}
+    output: default
+  - id: hcDzW3
+    name: pod_cmdb
+    final: false
+    disabled: false
+    pipeline: passthru
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: "(__inputId=='kube_metrics:in_kube_metrics') && pod!=null &&
+      image_id!=null && namespace!=null && image!=null "
+    clones:
+      - {}
+    output: default
+  - id: hhFtZN
+    name: cmdb_data
+    final: true
+    disabled: false
+    pipeline: passthru
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: __inputId=='kube_metrics:in_kube_metrics' && dataSource =="kube_metrics"
+      && __e["app.kubernetes.io/name"]!=null &&
+      __e["app.kubernetes.io/version"]!=null && namespace!=null &&
+      __e["helm.sh/chart"]!=null
+    clones:
+      - {}
+    output: default
+  - id: JdIBjG
+    name: odoo_data
+    final: true
+    disabled: false
+    pipeline: pos-logs
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: "__inputId=='kube_logs:in_kube_logs' "
+    clones:
+      - {}
+    output: default
+  - id: gLoSei
+    name: k8_ProcessMetrics
+    final: false
+    disabled: false
+    pipeline: pos_metrics
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: __inputId=='system_metrics:in_system_metrics' ||
+      __inputId=='kube_metrics:in_kube_metrics' || dataSource =="prom" ||
+      __inputId=="edge_prometheus:node_exporter"
+    clones:
+      - {}
+    output: default
+  - id: zB8sie
+    name: System Metrics
+    final: false
+    disabled: false
+    pipeline: Groupnameadd
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: __inputId=='system_metrics:in_system_metrics' || host
+    clones:
+      - {}
+    output: default
+  - id: default
+    name: default
+    final: true
+    disabled: false
+    pipeline: main
+    description: ""
+    enableOutputExpression: false
+    outputExpression: null
+    filter: "true"
+    clones: []
+    output: default

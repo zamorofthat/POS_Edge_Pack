@@ -1,0 +1,10 @@
+functions:
+  - id: eval
+    filter: host
+    disabled: null
+    conf:
+      add:
+        - disabled: false
+          value: host? `${host}-${__metadata["cribl"].group}-pos`:''
+          name: host
+groups: {}

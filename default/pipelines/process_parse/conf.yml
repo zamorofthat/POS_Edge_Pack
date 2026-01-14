@@ -1,0 +1,43 @@
+output: default
+streamtags: []
+groups: {}
+asyncFuncTimeout: 1000
+functions:
+  - id: serde
+    filter: "true"
+    disabled: false
+    conf:
+      mode: extract
+      type: json
+      srcField: _raw
+  - id: flatten
+    filter: "true"
+    disabled: null
+    conf:
+      fields:
+        - mem
+      prefix: ""
+      depth: 5
+      delimiter: _
+  - id: eval
+    filter: "true"
+    disabled: null
+    conf:
+      keep:
+        - _time
+        - sourcetype
+        - cpuPerc
+        - memPerc
+        - host
+      add:
+        - disabled: false
+          name: sourcetype
+          value: channel
+        - disabled: false
+          name: memPerc
+          value: Math.round((mem_heap / mem_rss * 100) * 10) / 10
+        - disabled: false
+          name: host
+          value: '`${host}-${__metadata["cribl"].group}-pos`'
+      remove:
+        - "*"
